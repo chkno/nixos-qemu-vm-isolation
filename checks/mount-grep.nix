@@ -13,5 +13,8 @@
 
     shared.succeed("[[ $(mount | grep -c virt) -gt 0 ]]")
     private.succeed("[[ $(mount | grep -c virt) -eq 0 ]]")
+
+    shared.succeed("[[ -e ${pkgs.pv} ]]")
+    private.fail("[[ -e ${pkgs.pv} ]]")
   '';
 }
