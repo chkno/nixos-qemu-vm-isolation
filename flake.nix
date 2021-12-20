@@ -1,4 +1,5 @@
 {
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
   outputs = { self, nixpkgs, }:
     let
       inherit (nixpkgs.lib) genAttrs;
