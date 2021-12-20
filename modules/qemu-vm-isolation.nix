@@ -28,7 +28,7 @@ in {
 
   system.build.squashfsStore =
     pkgs.callPackage (modulesPath + "/../lib/make-squashfs.nix") {
-      storeContents = config.virtualisation.pathsInNixDB;
+      storeContents = config.virtualisation.additionalPaths;
     };
 
   virtualisation = {
