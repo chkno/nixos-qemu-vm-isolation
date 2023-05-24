@@ -1,6 +1,6 @@
 { config, lib, modulesPath, pkgs, ... }:
 let
-  inherit (lib) findSingle mkForce mkVMOverride;
+  inherit (lib) findSingle mkForce mkIf mkMerge mkVMOverride;
 
   lookupDriveDeviceName = driveName: driveList:
     (findSingle (drive: drive.name == driveName)
@@ -12,41 +12,45 @@ let
   else
     "/nix/store";
 
-in {
+in mkMerge [
+  {
 
-  boot.initrd.availableKernelModules = [ "squashfs" ];
+    boot.initrd.availableKernelModules = [ "squashfs" ];
 
-  fileSystems = mkVMOverride {
-    "${storeMountPath}" = {
-      device =
-        lookupDriveDeviceName "nixstore" config.virtualisation.qemu.drives;
-      fsType = "squashfs";
-      options = [ "ro" ];
-      neededForBoot = true;
-    };
-  };
-
-  system.build.squashfsStore =
-    pkgs.callPackage (modulesPath + "/../lib/make-squashfs.nix") {
-      storeContents = config.virtualisation.additionalPaths;
-    };
-
-  virtualisation = {
-
-    # This should be the default.
-    bootDevice = lookupDriveDeviceName "root" config.virtualisation.qemu.drives;
-
-    sharedDirectories = mkForce { };
-
-    qemu.drives = [{
-      name = "nixstore";
-      file = "${config.system.build.squashfsStore}";
-      driveExtraOpts = {
-        format = "raw";
-        read-only = "on";
-        werror = "report";
+    fileSystems = mkVMOverride {
+      "${storeMountPath}" = {
+        device =
+          lookupDriveDeviceName "nixstore" config.virtualisation.qemu.drives;
+        fsType = "squashfs";
+        options = [ "ro" ];
+        neededForBoot = true;
       };
-    }];
+    };
 
-  };
-}
+    system.build.squashfsStore =
+      pkgs.callPackage (modulesPath + "/../lib/make-squashfs.nix") {
+        storeContents = config.virtualisation.additionalPaths;
+      };
+
+    virtualisation = {
+
+      sharedDirectories = mkForce { };
+
+      qemu.drives = [{
+        name = "nixstore";
+        file = "${config.system.build.squashfsStore}";
+        driveExtraOpts = {
+          format = "raw";
+          read-only = "on";
+          werror = "report";
+        };
+      }];
+
+    };
+  }
+  (mkIf (lib.version < "23.05") {
+    # This should always have been the default.
+    virtualisation.bootDevice =
+      lookupDriveDeviceName "root" config.virtualisation.qemu.drives;
+  })
+]
