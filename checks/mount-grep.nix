@@ -3,6 +3,8 @@ pkgs: {
 
   hostPkgs = pkgs;
 
+  includeTestScriptReferences = false;
+
   nodes = {
     shared = _: { };
     private = _: { imports = [ ../modules/qemu-vm-isolation.nix ]; };
@@ -26,8 +28,6 @@ pkgs: {
 
     shared.succeed("[[ -e ${pkgs.pv} ]]")
     private.fail("[[ -e ${pkgs.pv} ]]")
-
-    # useNixStoreImage isn't ready until this works:
-    # useNixStoreImage.fail("[[ -e ${pkgs.pv} ]]")
+    useNixStoreImage.fail("[[ -e ${pkgs.pv} ]]")
   '';
 }
