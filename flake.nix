@@ -13,8 +13,8 @@
         qemu-vm-isolation = import ./modules/qemu-vm-isolation.nix;
       };
       checks = forAllSystems (system: {
-        mount-grep = nixpkgs.legacyPackages."${system}".nixosTest
-          (import ./checks/mount-grep.nix);
+        mount-grep = nixpkgs.lib.nixos.runTest
+          (import ./checks/mount-grep.nix nixpkgs.legacyPackages."${system}");
       });
     };
 }

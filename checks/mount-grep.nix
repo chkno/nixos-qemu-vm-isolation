@@ -1,12 +1,14 @@
-{ lib, pkgs, ... }: {
+pkgs: {
   name = "qemu-private-store-mount-grep";
+
+  hostPkgs = pkgs;
 
   nodes = {
     shared = _: { };
     private = _: { imports = [ ../modules/qemu-vm-isolation.nix ]; };
     useNixStoreImage = {
       virtualisation = {
-        sharedDirectories = lib.mkForce { };
+        sharedDirectories = pkgs.lib.mkForce { };
         useNixStoreImage = true;
       };
     };
