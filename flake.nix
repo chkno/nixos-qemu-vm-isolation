@@ -4,7 +4,7 @@
     let
       inherit (nixpkgs.lib) genAttrs;
 
-      systems = nixpkgs.lib.systems.supported.tier1;
+      systems = import ./lib/tier1.nix nixpkgs;
 
       forAllSystems = genAttrs systems;
 
