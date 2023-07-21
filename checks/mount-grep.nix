@@ -8,6 +8,10 @@ pkgs: {
   nodes = {
     shared = _: { };
     private = _: { imports = [ ../modules/qemu-vm-isolation.nix ]; };
+    privateErofs = _: {
+      imports = [ ../modules/qemu-vm-isolation.nix ];
+      virtualisation.qemu.isolation.nixStoreFilesystemType = "erofs";
+    };
     useNixStoreImage = {
       virtualisation = {
         sharedDirectories = pkgs.lib.mkForce { };
@@ -18,13 +22,13 @@ pkgs: {
 
   testScript = ''
     start_all()
-    for machine in [shared, private, useNixStoreImage]:
+    for machine in [shared, private, privateErofs, useNixStoreImage]:
       machine.wait_for_unit("multi-user.target")
 
     shared.succeed("[[ $(mount | grep -c virt) -gt 0 ]]")
     shared.succeed("[[ -e ${pkgs.pv} ]]")
 
-    for machine in [private, useNixStoreImage]:
+    for machine in [private, privateErofs, useNixStoreImage]:
       machine.succeed("[[ $(mount | grep -c virt) -eq 0 ]]")
       machine.fail("[[ -e ${pkgs.pv} ]]")
   '';
