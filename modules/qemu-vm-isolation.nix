@@ -14,21 +14,35 @@ let
 
 in {
 
-  boot.initrd.availableKernelModules = [ "squashfs" ];
-
   fileSystems = mkVMOverride {
     "${storeMountPath}" = {
       device =
         lookupDriveDeviceName "nixstore" config.virtualisation.qemu.drives;
-      fsType = "squashfs";
+      fsType = "ext4";
       options = [ "ro" ];
       neededForBoot = true;
     };
   };
 
-  system.build.squashfsStore =
-    pkgs.callPackage (modulesPath + "/../lib/make-squashfs.nix") {
-      storeContents = config.virtualisation.additionalPaths;
+  # We use this to disable fsck runs on the ext4 nix store image because stage-1
+  # fsck crashes (maybe because the device is read-only?), halting boot.
+  boot.initrd.checkJournalingFS = false;
+
+  system.build.nixStoreImage =
+    import (modulesPath + "/../lib/make-disk-image.nix") {
+      inherit pkgs config lib;
+      additionalPaths = [
+        (config.virtualisation.host.pkgs.closureInfo {
+          rootPaths = config.virtualisation.additionalPaths;
+        })
+      ];
+      onlyNixStore = true;
+      label = "nix-store";
+      partitionTableType = "none";
+      installBootLoader = false;
+      diskSize = "auto";
+      additionalSpace = "0M";
+      copyChannel = false;
     };
 
   virtualisation = {
@@ -37,7 +51,7 @@ in {
 
     qemu.drives = [{
       name = "nixstore";
-      file = "${config.system.build.squashfsStore}";
+      file = "${config.system.build.nixStoreImage}/nixos.img";
       driveExtraOpts = {
         format = "raw";
         read-only = "on";
