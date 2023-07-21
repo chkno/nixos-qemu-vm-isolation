@@ -1,15 +1,9 @@
 { config, lib, modulesPath, pkgs, ... }:
 let
   inherit (lib)
-    escapeShellArg findSingle mkForce mkIf mkMerge mkOption mkVMOverride
-    optional;
+    escapeShellArg mkForce mkIf mkMerge mkOption mkVMOverride optional;
 
   cfg = config.virtualisation.qemu.isolation;
-
-  lookupDriveDeviceName = driveName: driveList:
-    (findSingle (drive: drive.name == driveName)
-      (throw "Drive ${driveName} not found")
-      (throw "Multiple drives named ${driveName}") driveList).device;
 
   storeMountPath = if config.virtualisation.writableStore then
     "/nix/.ro-store"
@@ -74,11 +68,10 @@ in {
 
       fileSystems = mkVMOverride {
         "${storeMountPath}" = {
-          device =
-            lookupDriveDeviceName "nixstore" config.virtualisation.qemu.drives;
           fsType = cfg.nixStoreFilesystemType;
           options = [ "ro" ];
           neededForBoot = true;
+          label = "nix-store";
         };
       };
 
@@ -90,7 +83,6 @@ in {
         sharedDirectories = mkForce { };
 
         qemu.drives = [{
-          name = "nixstore";
           file = "${config.system.build.nixStoreImage}/nixos.img";
           driveExtraOpts = {
             format = "raw";
