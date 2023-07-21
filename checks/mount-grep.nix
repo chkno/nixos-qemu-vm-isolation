@@ -18,16 +18,14 @@ pkgs: {
 
   testScript = ''
     start_all()
-    shared.wait_for_unit("multi-user.target")
-    private.wait_for_unit("multi-user.target")
-    useNixStoreImage.wait_for_unit("multi-user.target")
+    for machine in [shared, private, useNixStoreImage]:
+      machine.wait_for_unit("multi-user.target")
 
     shared.succeed("[[ $(mount | grep -c virt) -gt 0 ]]")
-    private.succeed("[[ $(mount | grep -c virt) -eq 0 ]]")
-    useNixStoreImage.succeed("[[ $(mount | grep -c virt) -eq 0 ]]")
-
     shared.succeed("[[ -e ${pkgs.pv} ]]")
-    private.fail("[[ -e ${pkgs.pv} ]]")
-    useNixStoreImage.fail("[[ -e ${pkgs.pv} ]]")
+
+    for machine in [private, useNixStoreImage]:
+      machine.succeed("[[ $(mount | grep -c virt) -eq 0 ]]")
+      machine.fail("[[ -e ${pkgs.pv} ]]")
   '';
 }
