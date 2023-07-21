@@ -16,37 +16,45 @@ let
     hostPkgs.closureInfo { rootPaths = config.virtualisation.additionalPaths; };
 
   nixStoreImages = {
-    ext4 = import (modulesPath + "/../lib/make-disk-image.nix") {
-      inherit pkgs config lib;
-      additionalPaths = [ storeContents ];
-      onlyNixStore = true;
-      label = "nix-store";
-      partitionTableType = "none";
-      installBootLoader = false;
-      diskSize = "auto";
-      additionalSpace = "0M";
-      copyChannel = false;
-    };
-    erofs = hostPkgs.runCommand "nix-store-image" { } ''
-      mkdir $out
-      cd ${builtins.storeDir}
-      ${hostPkgs.erofs-utils}/bin/mkfs.erofs \
-        --force-uid=0 \
-        --force-gid=0 \
-        -L nix-store \
-        -U eb176051-bd15-49b7-9e6b-462e0b467019 \
-        -T 0 \
-        --exclude-regex="$(
-          <${storeContents}/store-paths \
-            sed -e 's^.*/^^g' \
-          | cut -c -10 \
-          | ${hostPkgs.python3}/bin/python -c ${
-            escapeShellArg (builtins.readFile
-              (modulesPath + "/virtualisation/includes-to-excludes.py"))
-          } )" \
-        $out/nixos.img \
-        .
-    '';
+    ext4 = "${
+        import (modulesPath + "/../lib/make-disk-image.nix") {
+          inherit pkgs config lib;
+          additionalPaths = [ storeContents ];
+          onlyNixStore = true;
+          label = "nix-store";
+          partitionTableType = "none";
+          installBootLoader = false;
+          diskSize = "auto";
+          additionalSpace = "0M";
+          copyChannel = false;
+        }
+      }/nixos.img";
+    erofs = "${
+        hostPkgs.runCommand "nix-store-image" { } ''
+          mkdir $out
+          cd ${builtins.storeDir}
+          ${hostPkgs.erofs-utils}/bin/mkfs.erofs \
+            --force-uid=0 \
+            --force-gid=0 \
+            -L nix-store \
+            -U eb176051-bd15-49b7-9e6b-462e0b467019 \
+            -T 0 \
+            --exclude-regex="$(
+              <${storeContents}/store-paths \
+                sed -e 's^.*/^^g' \
+              | cut -c -10 \
+              | ${hostPkgs.python3}/bin/python -c ${
+                escapeShellArg (builtins.readFile
+                  (modulesPath + "/virtualisation/includes-to-excludes.py"))
+              } )" \
+            $out/nix-store.img \
+            .
+        ''
+      }/nix-store.img";
+    squashfs =
+      "${hostPkgs.callPackage (modulesPath + "/../lib/make-squashfs.nix") {
+        storeContents = config.virtualisation.additionalPaths;
+      }}";
   };
 
 in {
@@ -56,8 +64,11 @@ in {
         What filesystem to use for the guest's Nix store.
 
         erofs is more compact than ext4, but less mature.
+
+        squashfs support currently requires a dubious kludge that results in these
+        VMs not being able to mount any other squashfs volumes besides the nix store.
       '';
-      type = lib.types.enum [ "ext4" "erofs" ];
+      type = lib.types.enum [ "ext4" "erofs" "squashfs" ];
       default = "ext4";
     };
   };
@@ -65,6 +76,14 @@ in {
     {
       boot.initrd.kernelModules =
         optional (cfg.nixStoreFilesystemType == "erofs") "erofs";
+
+      nixpkgs.overlays = optional (cfg.nixStoreFilesystemType == "squashfs")
+        (final: prev: {
+          util-linux = prev.util-linux.overrideAttrs (old: {
+            patches = (old.patches or [ ])
+              ++ [ ./libblkid-squashfs-nix-store-kludge.patch ];
+          });
+        });
 
       fileSystems = mkVMOverride {
         "${storeMountPath}" = {
@@ -83,7 +102,7 @@ in {
         sharedDirectories = mkForce { };
 
         qemu.drives = [{
-          file = "${config.system.build.nixStoreImage}/nixos.img";
+          file = config.system.build.nixStoreImage;
           driveExtraOpts = {
             format = "raw";
             read-only = "on";

@@ -1,0 +1,19 @@
+# This dubious kludge results from
+# https://github.com/NixOS/nixpkgs/pull/236656 requiring filesystems to have labels and
+# https://github.com/plougher/squashfs-tools/issues/59 squashfs not supporting labels.
+diff --git a/libblkid/src/superblocks/squashfs.c b/libblkid/src/superblocks/squashfs.c
+index 4db842493..ed7465882 100644
+--- a/libblkid/src/superblocks/squashfs.c
++++ b/libblkid/src/superblocks/squashfs.c
+@@ -45,6 +45,11 @@ static int probe_squashfs(blkid_probe pr, const struct blkid_idmag *mag)
+ 
+ 	blkid_probe_sprintf_version(pr, "%u.%u", vermaj, vermin);
+ 
++	{
++		char label_kludge[] = "nix-store";
++		blkid_probe_set_label(pr, label_kludge, sizeof(label_kludge));
++	}
++
+ 	return 0;
+ }
+ 
